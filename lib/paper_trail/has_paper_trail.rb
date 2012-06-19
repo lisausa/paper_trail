@@ -7,39 +7,39 @@ module PaperTrail
 
 
     module ClassMethods
-      # Declare this in your model to track every create, update, and destroy.  Each version of
-      # the model is available in the `versions` association.
+      # Declare this in your model to track every create, update, and destroy.  Each revision of
+      # the model is available in the `revisions` association.
       #
       # Options:
       # :on           the events to track (optional; defaults to all of them).  Set to an array of
       #               `:create`, `:update`, `:destroy` as desired.
-      # :class_name   the name of a custom Version class.  This class should inherit from Version.
-      # :ignore       an array of attributes for which a new `Version` will not be created if only they change.
-      # :if, :unless  Procs that allow to specify conditions when to save versions for an object
-      # :only         inverse of `ignore` - a new `Version` will be created only for these attributes if supplied
+      # :class_name   the name of a custom Revision class.  This class should inherit from Revision.
+      # :ignore       an array of attributes for which a new `Revision` will not be created if only they change.
+      # :if, :unless  Procs that allow to specify conditions when to save revisions for an object
+      # :only         inverse of `ignore` - a new `Revision` will be created only for these attributes if supplied
       # :skip         fields to ignore completely.  As with `ignore`, updates to these fields will not create
-      #               a new `Version`.  In addition, these fields will not be included in the serialized versions
-      #               of the object whenever a new `Version` is created.
-      # :meta         a hash of extra data to store.  You must add a column to the `versions` table for each key.
+      #               a new `Revision`.  In addition, these fields will not be included in the serialized revisions
+      #               of the object whenever a new `Revision` is created.
+      # :meta         a hash of extra data to store.  You must add a column to the `revisions` table for each key.
       #               Values are objects or procs (which are called with `self`, i.e. the model with the paper
       #               trail).  See `PaperTrail::Controller.info_for_paper_trail` for how to store data from
       #               the controller.
-      # :versions     the name to use for the versions association.  Default is `:versions`.
-      # :version      the name to use for the method which returns the version the instance was reified from.
-      #               Default is `:version`.
+      # :revisions     the name to use for the revisions association.  Default is `:revisions`.
+      # :revision      the name to use for the method which returns the revision the instance was reified from.
+      #               Default is `:revision`.
       def has_paper_trail(options = {})
         # Lazily include the instance methods so we don't clutter up
         # any more ActiveRecord models than we have to.
         send :include, InstanceMethods
 
-        class_attribute :version_association_name
-        self.version_association_name = options[:version] || :version
+        class_attribute :revision_association_name
+        self.revision_association_name = options[:revision] || :revision
 
-        # The version this instance was reified from.
-        attr_accessor self.version_association_name
+        # The revision this instance was reified from.
+        attr_accessor self.revision_association_name
 
-        class_attribute :version_class_name
-        self.version_class_name = options[:class_name] || 'Version'
+        class_attribute :revision_class_name
+        self.revision_class_name = options[:class_name] || 'Revision'
 
         class_attribute :ignore
         self.ignore = ([options[:ignore]].flatten.compact || []).map &:to_s
@@ -62,16 +62,16 @@ module PaperTrail
         class_attribute :paper_trail_enabled_for_model
         self.paper_trail_enabled_for_model = true
 
-        class_attribute :versions_association_name
-        self.versions_association_name = options[:versions] || :versions
+        class_attribute :revisions_association_name
+        self.revisions_association_name = options[:revisions] || :revisions
 
-        has_many self.versions_association_name,
-                 :class_name => version_class_name,
+        has_many self.revisions_association_name,
+                 :class_name => revision_class_name,
                  :as         => :item,
-                 :order      => "#{PaperTrail.timestamp_field} ASC, #{self.version_class_name.constantize.primary_key} ASC"
+                 :order      => "#{PaperTrail.timestamp_field} ASC, #{self.revision_class_name.constantize.primary_key} ASC"
 
-        after_create  :record_create, :if => :save_version? if !options[:on] || options[:on].include?(:create)
-        before_update :record_update, :if => :save_version? if !options[:on] || options[:on].include?(:update)
+        after_create  :record_create, :if => :save_revision? if !options[:on] || options[:on].include?(:create)
+        before_update :record_update, :if => :save_revision? if !options[:on] || options[:on].include?(:update)
         after_destroy :record_destroy if !options[:on] || options[:on].include?(:destroy)
       end
 
@@ -90,45 +90,45 @@ module PaperTrail
     # ActiveRecord models that declare `has_paper_trail`.
     module InstanceMethods
       # Returns true if this instance is the current, live one;
-      # returns false if this instance came from a previous version.
+      # returns false if this instance came from a previous revision.
       def live?
-        source_version.nil?
+        source_revision.nil?
       end
 
       # Returns who put the object into its current state.
       def originator
-        version_class.with_item_keys(self.class.name, id).last.try :whodunnit
+        revision_class.with_item_keys(self.class.name, id).last.try :whodunnit
       end
 
-      # Returns the object (not a Version) as it was at the given timestamp.
-      def version_at(timestamp, reify_options={})
-        # Because a version stores how its object looked *before* the change,
-        # we need to look for the first version created *after* the timestamp.
-        v = send(self.class.versions_association_name).following(timestamp).first
+      # Returns the object (not a Revision) as it was at the given timestamp.
+      def revision_at(timestamp, reify_options={})
+        # Because a revision stores how its object looked *before* the change,
+        # we need to look for the first revision created *after* the timestamp.
+        v = send(self.class.revisions_association_name).following(timestamp).first
         v ? v.reify(reify_options) : self
       end
 
-      # Returns the objects (not Versions) as they were between the given times.
-      def versions_between(start_time, end_time, reify_options={})
-        versions = send(self.class.versions_association_name).between(start_time, end_time)
-        versions.collect { |version| version_at(version.send PaperTrail.timestamp_field) }
+      # Returns the objects (not Revisions) as they were between the given times.
+      def revisions_between(start_time, end_time, reify_options={})
+        revisions = send(self.class.revisions_association_name).between(start_time, end_time)
+        revisions.collect { |revision| revision_at(revision.send PaperTrail.timestamp_field) }
       end
 
-      # Returns the object (not a Version) as it was most recently.
-      def previous_version
-        preceding_version = source_version ? source_version.previous : send(self.class.versions_association_name).last
-        preceding_version.try :reify
+      # Returns the object (not a Revision) as it was most recently.
+      def previous_revision
+        preceding_revision = source_revision ? source_revision.previous : send(self.class.revisions_association_name).last
+        preceding_revision.try :reify
       end
 
-      # Returns the object (not a Version) as it became next.
-      def next_version
-        # NOTE: if self (the item) was not reified from a version, i.e. it is the
+      # Returns the object (not a Revision) as it became next.
+      def next_revision
+        # NOTE: if self (the item) was not reified from a revision, i.e. it is the
         # "live" item, we return nil.  Perhaps we should return self instead?
-        subsequent_version = source_version ? source_version.next : nil
-        subsequent_version.reify if subsequent_version
+        subsequent_revision = source_revision ? source_revision.next : nil
+        subsequent_revision.reify if subsequent_revision
       end
 
-      # Executes the given method or block without creating a new version.
+      # Executes the given method or block without creating a new revision.
       def without_versioning(method = nil)
         paper_trail_was_enabled = self.paper_trail_enabled_for_model
         self.class.paper_trail_off
@@ -136,20 +136,21 @@ module PaperTrail
       ensure
         self.class.paper_trail_on if paper_trail_was_enabled
       end
+      alias :without_paper_trail :without_versioning
 
       private
 
-      def version_class
-        version_class_name.constantize
+      def revision_class
+        revision_class_name.constantize
       end
 
-      def source_version
-        send self.class.version_association_name
+      def source_revision
+        send self.class.revision_association_name
       end
 
       def record_create
         if switched_on?
-          send(self.class.versions_association_name).create merge_metadata(:event => 'create', :whodunnit => PaperTrail.whodunnit)
+          send(self.class.revisions_association_name).create merge_metadata(:event => 'create', :whodunnit => PaperTrail.whodunnit)
         end
       end
 
@@ -160,25 +161,25 @@ module PaperTrail
             :object    => object_to_string(item_before_change),
             :whodunnit => PaperTrail.whodunnit
           }
-          if version_class.column_names.include? 'object_changes'
+          if revision_class.column_names.include? 'object_changes'
             # The double negative (reject, !include?) preserves the hash structure of self.changes.
             data[:object_changes] = self.changes.reject do |key, value|
               !notably_changed.include?(key)
             end.to_yaml
           end
-          send(self.class.versions_association_name).build merge_metadata(data)
+          send(self.class.revisions_association_name).build merge_metadata(data)
         end
       end
 
       def record_destroy
         if switched_on? and not new_record?
-          version_class.create merge_metadata(:item_id   => self.id,
+          revision_class.create merge_metadata(:item_id   => self.id,
                                               :item_type => self.class.base_class.name,
                                               :event     => 'destroy',
                                               :object    => object_to_string(item_before_change),
                                               :whodunnit => PaperTrail.whodunnit)
         end
-        send(self.class.versions_association_name).send :load_target
+        send(self.class.revisions_association_name).send :load_target
       end
 
       def merge_metadata(data)
@@ -229,7 +230,7 @@ module PaperTrail
         PaperTrail.enabled? && PaperTrail.enabled_for_controller? && self.class.paper_trail_enabled_for_model
       end
 
-      def save_version?
+      def save_revision?
         (if_condition.blank? || if_condition.call(self)) && !unless_condition.try(:call, self)
       end
     end

@@ -11,7 +11,7 @@ module PaperTrail
 
     # Returns the user who is responsible for any changes that occur.
     # By default this calls `current_user` and returns the result.
-    # 
+    #
     # Override this method in your controller to call a different
     # method, e.g. `current_person`, or anything you like.
     def user_for_paper_trail
@@ -24,14 +24,14 @@ module PaperTrail
     #
     # Override this method in your controller to return a hash of any
     # information you need.  The hash's keys must correspond to columns
-    # in your `versions` table, so don't forget to add any new columns
+    # in your `revisions` table, so don't forget to add any new columns
     # you need.
     #
     # For example:
     #
     #     {:ip => request.remote_ip, :user_agent => request.user_agent}
     #
-    # The columns `ip` and `user_agent` must exist in your `versions` # table.
+    # The columns `ip` and `user_agent` must exist in your `revisions` # table.
     #
     # Use the `:meta` option to `PaperTrail::Model::ClassMethods.has_paper_trail`
     # to store any extra model-level data you need.
@@ -50,7 +50,7 @@ module PaperTrail
 
     private
 
-    # Tells PaperTrail whether versions should be saved in the current request.
+    # Tells PaperTrail whether revisions should be saved in the current request.
     def set_paper_trail_enabled_for_controller
       ::PaperTrail.enabled_for_controller = paper_trail_enabled_for_controller
     end

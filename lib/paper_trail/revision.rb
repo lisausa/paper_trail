@@ -1,4 +1,4 @@
-class Version < ActiveRecord::Base
+class Revision < ActiveRecord::Base
   belongs_to :item, :polymorphic => true
   validates_presence_of :event
   attr_accessible :item_type, :item_id, :event, :whodunnit, :object, :object_changes
@@ -19,16 +19,16 @@ class Version < ActiveRecord::Base
     where :event => 'destroy'
   end
 
-  scope :subsequent, lambda { |version|
-    where(["#{self.primary_key} > ?", version]).order("#{self.primary_key} ASC")
+  scope :subsequent, lambda { |revision|
+    where(["#{self.primary_key} > ?", revision]).order("#{self.primary_key} ASC")
   }
 
-  scope :preceding, lambda { |version|
-    where(["#{self.primary_key} < ?", version]).order("#{self.primary_key} DESC")
+  scope :preceding, lambda { |revision|
+    where(["#{self.primary_key} < ?", revision]).order("#{self.primary_key} DESC")
   }
 
   scope :following, lambda { |timestamp|
-    # TODO: is this :order necessary, considering its presence on the has_many :versions association?
+    # TODO: is this :order necessary, considering its presence on the has_many :revisions association?
     where(["#{PaperTrail.timestamp_field} > ?", timestamp]).
       order("#{PaperTrail.timestamp_field} ASC, #{self.primary_key} ASC")
   }
@@ -38,7 +38,7 @@ class Version < ActiveRecord::Base
       order("#{PaperTrail.timestamp_field} ASC, #{self.primary_key} ASC")
   }
 
-  # Restore the item from this version.
+  # Restore the item from this revision.
   #
   # This will automatically restore all :has_one associations as they were "at the time",
   # if they are also being versioned by PaperTrail.  NOTE: this isn't always guaranteed
@@ -83,11 +83,11 @@ class Version < ActiveRecord::Base
           if model.respond_to?("#{k}=")
             model.send :write_attribute, k.to_sym, v
           else
-            logger.warn "Attribute #{k} does not exist on #{item_type} (Version id: #{id})."
+            logger.warn "Attribute #{k} does not exist on #{item_type} (Revision id: #{id})."
           end
         end
 
-        model.send "#{model.class.version_association_name}=", self
+        model.send "#{model.class.revision_association_name}=", self
 
         unless options[:has_one] == false
           reify_has_ones model, options[:has_one]
@@ -98,8 +98,8 @@ class Version < ActiveRecord::Base
     end
   end
 
-  # Returns what changed in this version of the item.  Cf. `ActiveModel::Dirty#changes`.
-  # Returns nil if your `versions` table does not have an `object_changes` text column.
+  # Returns what changed in this revision of the item.  Cf. `ActiveModel::Dirty#changes`.
+  # Returns nil if your `revisions` table does not have an `object_changes` text column.
   def changeset
     if self.class.column_names.include? 'object_changes'
       if changes = object_changes
@@ -110,37 +110,37 @@ class Version < ActiveRecord::Base
     end
   end
 
-  # Returns who put the item into the state stored in this version.
+  # Returns who put the item into the state stored in this revision.
   def originator
     previous.try :whodunnit
   end
 
-  # Returns who changed the item from the state it had in this version.
+  # Returns who changed the item from the state it had in this revision.
   # This is an alias for `whodunnit`.
   def terminator
     whodunnit
   end
 
-  def sibling_versions
+  def sibling_revisions
     self.class.with_item_keys(item_type, item_id)
   end
 
   def next
-    sibling_versions.subsequent(self).first
+    sibling_revisions.subsequent(self).first
   end
 
   def previous
-    sibling_versions.preceding(self).first
+    sibling_revisions.preceding(self).first
   end
 
   def index
     id_column = self.class.primary_key.to_sym
-    sibling_versions.select(id_column).order("#{id_column} ASC").map(&id_column).index(self.send(id_column))
+    sibling_revisions.select(id_column).order("#{id_column} ASC").map(&id_column).index(self.send(id_column))
   end
 
   private
 
-  # In Rails 3.1+, calling reify on a previous version confuses the
+  # In Rails 3.1+, calling reify on a previous revision confuses the
   # IdentityMap, if enabled. This prevents insertion into the map.
   def without_identity_map(&block)
     if defined?(ActiveRecord::IdentityMap) && ActiveRecord::IdentityMap.respond_to?(:without)
@@ -150,7 +150,7 @@ class Version < ActiveRecord::Base
     end
   end
 
-  # Restore the `model`'s has_one associations as they were when this version was
+  # Restore the `model`'s has_one associations as they were when this revision was
   # superseded by the next (because that's what the user was looking at when they
   # made the change).
   #
@@ -158,13 +158,13 @@ class Version < ActiveRecord::Base
   def reify_has_ones(model, lookback)
     model.class.reflect_on_all_associations(:has_one).each do |assoc|
       child = model.send assoc.name
-      if child.respond_to? :version_at
-        # N.B. we use version of the child as it was `lookback` seconds before the parent was updated.
-        # Ideally we want the version of the child as it was just before the parent was updated...
+      if child.respond_to? :revision_at
+        # N.B. we use revision of the child as it was `lookback` seconds before the parent was updated.
+        # Ideally we want the revision of the child as it was just before the parent was updated...
         # but until PaperTrail knows which updates are "together" (e.g. parent and child being
         # updated on the same form), it's impossible to tell when the overall update started;
         # and therefore impossible to know when "just before" was.
-        if (child_as_it_was = child.version_at(send(PaperTrail.timestamp_field) - lookback.seconds))
+        if (child_as_it_was = child.revision_at(send(PaperTrail.timestamp_field) - lookback.seconds))
           child_as_it_was.attributes.each do |k,v|
             model.send(assoc.name).send :write_attribute, k.to_sym, v rescue nil
           end

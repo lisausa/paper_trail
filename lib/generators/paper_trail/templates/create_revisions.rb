@@ -1,6 +1,6 @@
-class CreateVersions < ActiveRecord::Migration
+class CreateRevisions < ActiveRecord::Migration
   def self.up
-    create_table :versions do |t|
+    create_table :revisions do |t|
       t.string   :item_type, :null => false
       t.integer  :item_id,   :null => false
       t.string   :event,     :null => false
@@ -8,11 +8,11 @@ class CreateVersions < ActiveRecord::Migration
       t.text     :object
       t.datetime :created_at
     end
-    add_index :versions, [:item_type, :item_id]
+    add_index :revisions, [:item_type, :item_id]
   end
 
   def self.down
-    remove_index :versions, [:item_type, :item_id]
-    drop_table :versions
+    remove_index :revisions, [:item_type, :item_id]
+    drop_table :revisions
   end
 end

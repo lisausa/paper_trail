@@ -36,7 +36,7 @@ ActiveRecord::Schema.define(:version => 20110208155312) do
     t.string "name"
   end
 
-  create_table "post_versions", :force => true do |t|
+  create_table "post_revisions", :force => true do |t|
     t.string   "item_type",  :null => false
     t.integer  "item_id",    :null => false
     t.string   "event",      :null => false
@@ -47,7 +47,7 @@ ActiveRecord::Schema.define(:version => 20110208155312) do
     t.string   "user_agent"
   end
 
-  add_index "post_versions", ["item_type", "item_id"], :name => "index_post_versions_on_item_type_and_item_id"
+  add_index "post_revisions", ["item_type", "item_id"], :name => "index_post_revisions_on_item_type_and_item_id"
 
   create_table "posts", :force => true do |t|
     t.string "title"
@@ -58,7 +58,7 @@ ActiveRecord::Schema.define(:version => 20110208155312) do
     t.integer "length"
   end
 
-  create_table "versions", :force => true do |t|
+  create_table "revisions", :force => true do |t|
     t.string   "item_type",  :null => false
     t.integer  "item_id",    :null => false
     t.string   "event",      :null => false
@@ -73,7 +73,7 @@ ActiveRecord::Schema.define(:version => 20110208155312) do
     t.string   "user_agent"
   end
 
-  add_index "versions", ["item_type", "item_id"], :name => "index_versions_on_item_type_and_item_id"
+  add_index "revisions", ["item_type", "item_id"], :name => "index_revisions_on_item_type_and_item_id"
 
   create_table "widgets", :force => true do |t|
     t.string   "name"
