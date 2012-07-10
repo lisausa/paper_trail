@@ -139,6 +139,11 @@ module PaperTrail
       end
       alias :without_paper_trail :without_versioning
 
+      # Unfortunately, this cannot be private
+      def id_as_string
+        self.id.to_s
+      end
+
       private
 
       def revision_class
@@ -233,10 +238,6 @@ module PaperTrail
 
       def save_revision?
         (if_condition.blank? || if_condition.call(self)) && !unless_condition.try(:call, self)
-      end
-
-      def id_as_string
-        self.id.to_s
       end
     end
   end
