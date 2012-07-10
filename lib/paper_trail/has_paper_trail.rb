@@ -66,9 +66,10 @@ module PaperTrail
         self.revisions_association_name = options[:revisions] || :revisions
 
         has_many self.revisions_association_name,
-                 :class_name => revision_class_name,
-                 :as         => :item,
-                 :order      => "#{PaperTrail.timestamp_field} ASC, #{self.revision_class_name.constantize.primary_key} ASC"
+                 :class_name  => revision_class_name,
+                 :as          => :item,
+                 :primary_key => :id_as_string,
+                 :order       => "#{PaperTrail.timestamp_field} ASC, #{self.revision_class_name.constantize.primary_key} ASC"
 
         after_create  :record_create, :if => :save_revision? if !options[:on] || options[:on].include?(:create)
         before_update :record_update, :if => :save_revision? if !options[:on] || options[:on].include?(:update)
@@ -173,7 +174,7 @@ module PaperTrail
 
       def record_destroy
         if switched_on? and not new_record?
-          revision_class.create merge_metadata(:item_id   => self.id,
+          revision_class.create merge_metadata(:item_id   => self.id_as_string,
                                               :item_type => self.class.base_class.name,
                                               :event     => 'destroy',
                                               :object    => object_to_string(item_before_change),
@@ -232,6 +233,10 @@ module PaperTrail
 
       def save_revision?
         (if_condition.blank? || if_condition.call(self)) && !unless_condition.try(:call, self)
+      end
+
+      def id_as_string
+        self.id.to_s
       end
     end
   end
