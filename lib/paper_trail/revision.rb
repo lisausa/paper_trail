@@ -4,7 +4,7 @@ class Revision < ActiveRecord::Base
   attr_accessible :item_type, :item_id, :event, :whodunnit, :object, :object_changes
 
   def self.with_item_keys(item_type, item_id)
-    scoped(:conditions => { :item_type => item_type, :item_id => item_id })
+    scoped(:conditions => { :item_type => item_type, :item_id => item_id.to_s })
   end
 
   def self.creates
